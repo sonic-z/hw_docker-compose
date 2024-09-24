@@ -1,0 +1,61 @@
+networks:
+  db_net:
+  back_net:
+
+services:
+  django-app:
+    build: ./smart_home
+    command: gunicorn smart_home.wsgi:application --bind 0.0.0.0:8000
+    networks:
+      - db_net
+      - back_net
+    env_file:
+      - django.env
+    ports:
+      - '8000:8000'
+    depends_on:
+      - postgres
+    volumes:
+      - static_volume:/opt/smart_home/static
+      - media_volume:/opt/smart_home/media
+
+  postgres:
+    image: postgres:16.4-alpine
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -u postgres -d netology_smart_home"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - postgres_volume:/var/lib/postgresql/data/
+    env_file:
+      - postgres.env
+    networks:
+      - db_net
+    ports:
+      - '5432:5432'
+  nginx:
+    build: ./nginx
+    hostname: localhost
+    container_name: nginx
+    volumes:
+      - static_volume:/opt/smart_home/static
+      - media_volume:/opt/smart_home/media
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    networks:
+      - back_net
+    depends_on:
+      - django-app
+    
+volumes:
+  static_volume:
+  media_volume:
+  postgres_volume:
